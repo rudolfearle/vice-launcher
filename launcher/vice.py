@@ -1,6 +1,10 @@
 import os
 import shutil
 import subprocess
+import tempfile
+import zipfile
+
+from . import scanner
 
 # Default machine binary per file extension.
 # Nearly everything floating around is C64, so we default to x64sc
@@ -16,8 +20,9 @@ EXTENSION_MACHINE = {
 MACHINES = ["x64sc", "x128", "xvic", "xplus4", "xpet", "xcbm2"]
 
 
-def machine_for_extension(ext):
-    return EXTENSION_MACHINE.get(ext.lower(), "x64sc")
+def machine_for_extension(ext, cfg=None):
+    default = cfg.get("default_machine", "x64sc") if cfg else "x64sc"
+    return EXTENSION_MACHINE.get(ext.lower(), default)
 
 
 def resolve_binary(cfg, machine):
@@ -38,15 +43,51 @@ def resolve_binary(cfg, machine):
     return None
 
 
+def _extract_zip_entry(zip_path):
+    """Extract the first supported game file found inside a zip to a temp dir.
+
+    Returns the extracted file's path, or None if the zip couldn't be read
+    or contains nothing VICE can autostart directly.
+    """
+    inner_extensions = scanner.SUPPORTED_EXTENSIONS - {".zip"}
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            candidates = sorted(
+                name for name in zf.namelist()
+                if not name.endswith("/")
+                and os.path.splitext(name)[1].lower() in inner_extensions
+            )
+            if not candidates:
+                return None
+            member = candidates[0]
+            dest_dir = tempfile.mkdtemp(prefix="vice_launcher_")
+            zf.extract(member, dest_dir)
+            return os.path.join(dest_dir, member)
+    except (zipfile.BadZipFile, OSError):
+        return None
+
+
 def launch_game(cfg, game):
     """Launch a game entry via VICE. Returns the Popen object."""
-    machine = game.get("machine") or machine_for_extension(game["ext"])
+    machine_override = (cfg.get("machine_overrides") or {}).get(game["path"])
+    launch_path = game["path"]
+    ext = game["ext"]
+
+    if ext == ".zip":
+        # VICE can usually open zips directly, but some builds/archive layouts
+        # choke on it. Extracting the inner image ourselves is a reliable fallback.
+        extracted = _extract_zip_entry(game["path"])
+        if extracted:
+            launch_path = extracted
+            ext = os.path.splitext(extracted)[1].lower()
+
+    machine = machine_override or machine_for_extension(ext, cfg)
     command = resolve_binary(cfg, machine)
     if command is None:
         raise FileNotFoundError(
             f"Could not find the VICE binary '{machine}'.\n\n"
-            f"Fix this via File > Set VICE Binary Folder, or, if you installed "
-            f"VICE through Flathub, enable File > Use Flatpak VICE instead."
+            f"Fix this via File > Preferences, or, if you installed "
+            f"VICE through Flathub, enable the Flatpak VICE option there instead."
         )
-    full_command = command + ["-autostart", game["path"]]
+    full_command = command + ["-autostart", launch_path]
     return subprocess.Popen(full_command)
