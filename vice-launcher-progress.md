@@ -2,7 +2,9 @@
 
 _Last updated: 2026-08-20_
 
-## Status: Phase 1 complete (not yet on GitHub)
+## Status: Phase 1 and Phase 2 complete, pushed to GitHub
+
+Repo: https://github.com/rudolfearle/vice-launcher
 
 ## What's done
 
@@ -50,28 +52,36 @@ Delivered as `vice-launcher.zip`, git-initialized locally with one commit
 ("Phase 1: basic VICE game launcher"), `.gitignore` already excludes
 `__pycache__` and `config.json`.
 
-## Open item: push to GitHub
+## Phase 2 — done
 
-Not yet pushed — no GitHub connector is available to do this
-automatically, and I don't hold your credentials. Two ways to finish it,
-covered in detail earlier in this chat:
+- [x] Favorites list — right-click a game to add/remove; View menu has an
+      "All Games" / "Favorites" / "Recently Played" toggle. Persisted in
+      `config.json` under `favorites` (list of paths).
+- [x] "Recently played" tracking — recorded on every successful launch,
+      newest first, capped at 20 entries (`config.py: RECENT_LIMIT`).
+      Persisted under `recent` (list of `{path, ts}`).
+- [x] Per-game machine override — right-click > Set Machine, checkmark
+      shows the active choice (including "Default"). Persisted under
+      `machine_overrides` (`{path: machine}`) in `config.json`.
+- [x] Zip auto-extract fallback — `vice.py: _extract_zip_entry` unzips the
+      first supported image found inside a `.zip` to a temp dir and
+      launches that directly; falls back to launching the zip as-is only
+      if nothing usable is found inside (bad zip, no supported member).
+- [x] Settings dialog — File > Preferences opens a proper `Toplevel`
+      (games folder, VICE binary folder, Flatpak toggle, default machine
+      dropdown) instead of raw folder-picker menu items.
 
-- **With `gh` CLI:** `gh repo create vice-launcher --public --source=. --remote=origin --push`
-- **Without it:** create the repo on github.com, then `git remote add origin ... && git push -u origin main`
+**Tested:** `py_compile` on all modules, unit-style checks of the new
+`config.py` helpers (favorites toggle, recent-list capping/ordering,
+machine override get/set) and the zip extraction fallback (both a zip
+with a usable image and one without), plus a scripted Tk smoke test that
+builds `LauncherApp`, loads a fake library, exercises the favorites view,
+sets a machine override, and opens `PreferencesDialog` — all without
+errors. Still not tested: an actual VICE binary launching a real game.
 
-## Next steps — Phase 2 (quality of life)
+## Next steps
 
-- [ ] Favorites list (star a game, filter to favorites)
-- [ ] "Recently played" tracking, persisted alongside config
-- [ ] Per-game machine override in the UI (the mapping logic in
-      `vice.py` already supports C128/VIC-20/Plus4/PET — just needs a
-      dropdown/right-click menu exposed in `gui.py`)
-- [ ] Handle `.zip` files that VICE can't open directly (auto-extract to
-      a temp dir as a fallback)
-- [ ] Basic settings dialog instead of raw folder pickers (e.g. a
-      proper preferences window)
-
-## Later — Phase 3 (polish)
+## Phase 3 (polish)
 
 - [ ] Cover art support — thumbnail per game, likely via a filename-keyed
       `covers/` folder
