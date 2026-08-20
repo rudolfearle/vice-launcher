@@ -1,21 +1,27 @@
+import math
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from . import config as cfgmod
+from . import covers
 from . import scanner
 from . import vice
+
+PREVIEW_MAX_WIDTH = 260
+PREVIEW_MAX_HEIGHT = 300
 
 
 class LauncherApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("VICE Game Launcher")
-        self.geometry("640x480")
+        self.geometry("820x480")
 
         self.cfg = cfgmod.load_config()
         self.all_games = []
         self.filtered_games = []
         self.view_var = tk.StringVar(value="all")
+        self.preview_image = None
 
         self._build_menu()
         self._build_widgets()
@@ -49,8 +55,18 @@ class LauncherApp(tk.Tk):
         self.config(menu=menubar)
 
     def _build_widgets(self):
-        search_frame = ttk.Frame(self)
-        search_frame.pack(fill="x", padx=8, pady=8)
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill="both", expand=True, padx=8, pady=8)
+
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side="left", fill="both", expand=True)
+
+        right_frame = ttk.Frame(main_frame, width=PREVIEW_MAX_WIDTH + 20)
+        right_frame.pack(side="right", fill="y", padx=(8, 0))
+        right_frame.pack_propagate(False)
+
+        search_frame = ttk.Frame(left_frame)
+        search_frame.pack(fill="x")
 
         ttk.Label(search_frame, text="Search:").pack(side="left")
         self.search_var = tk.StringVar()
@@ -58,22 +74,29 @@ class LauncherApp(tk.Tk):
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var)
         search_entry.pack(side="left", fill="x", expand=True, padx=6)
 
-        list_frame = ttk.Frame(self)
-        list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        list_frame = ttk.Frame(left_frame)
+        list_frame.pack(fill="both", expand=True, pady=8)
 
         self.listbox = tk.Listbox(list_frame, activestyle="dotbox")
         self.listbox.pack(side="left", fill="both", expand=True)
         self.listbox.bind("<Double-Button-1>", lambda _e: self._launch_selected())
         self.listbox.bind("<Return>", lambda _e: self._launch_selected())
         self.listbox.bind("<Button-3>", self._show_context_menu)
+        self.listbox.bind("<<ListboxSelect>>", self._update_preview)
 
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.listbox.yview)
         scrollbar.pack(side="right", fill="y")
         self.listbox.config(yscrollcommand=scrollbar.set)
 
-        button_frame = ttk.Frame(self)
-        button_frame.pack(fill="x", padx=8, pady=(0, 8))
+        button_frame = ttk.Frame(left_frame)
+        button_frame.pack(fill="x")
         ttk.Button(button_frame, text="Launch", command=self._launch_selected).pack(side="right")
+
+        self.preview_label = ttk.Label(
+            right_frame, anchor="center", justify="center", relief="groove",
+            text="Select a game to preview", wraplength=PREVIEW_MAX_WIDTH,
+        )
+        self.preview_label.pack(fill="both", expand=True)
 
         self.status_var = tk.StringVar(value="Ready")
         status_bar = ttk.Label(self, textvariable=self.status_var, anchor="w", relief="sunken")
@@ -118,6 +141,38 @@ class LauncherApp(tk.Tk):
         for g in self.filtered_games:
             star = "★ " if cfgmod.is_favorite(self.cfg, g["path"]) else ""
             self.listbox.insert(tk.END, f"{star}{g['title']}")
+
+        self._update_preview()
+
+    def _update_preview(self, _event=None):
+        selection = self.listbox.curselection()
+        if not selection:
+            self._set_preview_image(None)
+            return
+        game = self.filtered_games[selection[0]]
+        path = covers.find_cover_path(self.cfg.get("games_dir"), game["title"])
+        self._set_preview_image(path)
+
+    def _set_preview_image(self, path):
+        if not path:
+            self.preview_label.config(image="", text="No image available")
+            self.preview_image = None
+            return
+        try:
+            img = tk.PhotoImage(file=path)
+            img = self._fit_image(img, PREVIEW_MAX_WIDTH, PREVIEW_MAX_HEIGHT)
+            self.preview_label.config(image=img, text="")
+            self.preview_image = img  # keep a reference so it isn't garbage-collected
+        except tk.TclError:
+            self.preview_label.config(image="", text="Could not load image")
+            self.preview_image = None
+
+    @staticmethod
+    def _fit_image(img, max_width, max_height):
+        factor = max(1, math.ceil(max(img.width() / max_width, img.height() / max_height)))
+        if factor > 1:
+            img = img.subsample(factor, factor)
+        return img
 
     def _launch_selected(self):
         selection = self.listbox.curselection()
