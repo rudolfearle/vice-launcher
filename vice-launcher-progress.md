@@ -136,11 +136,38 @@ geometry, and confirms selecting a game with known art
 (`1942 (15)`) attaches a correctly-resized image (224x256) to the
 preview label.
 
+## Joystick/controller configuration — done (2026-08-20)
+
+- [x] `launcher/joystick.py: detect_analog_joysticks` scans `/dev/input/js*`
+      and reads the device name from `/sys/class/input/jsN/device/name`,
+      with a fallback decoder for pads that report a mis-encoded (looks
+      like UTF-16-in-UTF-8) name string — the Astrum PS2-lookalike
+      connected on this machine (Sony DualShock3 VID/PID `054c:0268`,
+      handled by the kernel's `hid-sony` driver) hit exactly this case.
+- [x] Preferences dialog gained "Joystick port 1" / "Joystick port 2"
+      dropdowns listing None/Numpad/Keyset 1/Keyset 2 plus any detected
+      analog joysticks by name. Persisted in `config.json` as `joydev1`
+      / `joydev2` (VICE's own `-joydevN` device codes).
+- [x] `vice.py: JOYSTICK_PORTS` maps which native joystick ports each
+      machine binary actually supports (PET and CBM-II have none, VIC-20
+      has one, C64/C128/Plus4 have two) so `launch_game` only appends
+      `-joydev1`/`-joydev2` when the target machine supports that port —
+      passing an unsupported flag makes those VICE binaries error out.
+
+**Tested:** `py_compile`, unit checks confirming the built launch command
+includes both joydev flags for x64sc, only `-joydev1` for xvic, and
+neither for xpet, a scripted Preferences-dialog check that saving a
+selected joystick label round-trips to the correct device code in
+`cfg["joydev1"]`, and a real launch against the actual connected
+controller — VICE's log confirmed
+`registered controller '...PLAYSTATION(R)3 Controller' with 6 axes, 0
+hats, 17 buttons` and the game autostarted normally with
+`-joydev1 4 -joydev2 0` on the command line.
+
 ## Next steps
 
 ## Phase 3 (polish)
 
-- [ ] Joystick/controller pass-through configuration
 - [ ] Track the running VICE process so the launcher can detect when a
       game exits and bring itself back to front
 - [ ] Packaging (PyInstaller) for a distributable binary, if wanted
