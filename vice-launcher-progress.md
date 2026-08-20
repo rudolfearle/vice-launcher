@@ -208,6 +208,46 @@ path as the dev-mode script.
 
 ## Phase 3 — all items complete
 
+## Desktop launcher points at the packaged binary (2026-08-20)
+
+`vice-launcher.desktop` (both the repo copy and `~/Desktop/`) now runs
+`dist/vice-launcher` directly instead of `python3 main.py`. Since the
+shortcut no longer runs from source, **the binary must be rebuilt after
+any change to `launcher/*.py` or `main.py`** (`./tools/build_binary.sh`)
+or the desktop icon will keep launching the old build. This is now a
+standing rule (saved to session memory) — done automatically after
+future source changes, no need to ask again.
+
+## Cover art: fuzzy-matched zip pack import (2026-08-20)
+
+- [x] Imported a second art source: a set of "C64 Logos (A-Z).zip"
+      archives dropped in
+      `/media/SHARE/roms/c64/images/images packs/`. Unlike the
+      Lassiveran pack, these use plain titles with no region/version
+      tags (e.g. `007 Car Chase.png`), so exact base-title matching
+      already caught 2,972 of 3,422 images.
+- [x] Added `tools/import_zip_pack.py` — reads images directly out of
+      zip files (no full extraction needed), matches on a normalized
+      base title (lowercase, `&`→`and`, punctuation stripped), and
+      falls back to fuzzy matching (`rapidfuzz` `token_sort_ratio`,
+      cutoff 90) for the remainder — mostly TOSEC `"X, The"` vs pack
+      `"The X"` reordering and minor spelling variants (`Elektraglide`
+      vs `Elektra Glide`). Filters obvious junk filenames
+      (`cooltext123...` placeholder graphics). Every fuzzy match is
+      printed for review; a lower cutoff (88) was tested first and
+      rejected after it paired unrelated games (`Skate` → `Skat`,
+      `Dragon's Eye` → `Dragon's Keep`) — 90 was the cleanest cutoff
+      found by inspection.
+- [x] Applied: 2,972 exact + 235 fuzzy-matched image groups → 1,566
+      newly copied covers (rest were already covered by the Lassiveran
+      import). Total coverage: **5,944 / 22,021 games (~27%)**, up from
+      4,215.
+
+**Tested:** dry run vs `--apply` counts cross-checked; manually
+eyeballed every one of the 110 game entries that came from a fuzzy
+match (printed in the tool's output) and confirmed each pairing is
+correct before trusting the cutoff.
+
 ## Decisions made so far (for reference)
 
 - **GUI toolkit:** Tkinter, chosen for zero extra dependencies. PyQt6
