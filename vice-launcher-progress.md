@@ -2,7 +2,7 @@
 
 _Last updated: 2026-08-20_
 
-## Status: Phase 1 and Phase 2 complete, pushed to GitHub. Real VICE launch confirmed working.
+## Status: Phases 1-3 complete, pushed to GitHub. Real VICE launch confirmed working.
 
 Repo: https://github.com/rudolfearle/vice-launcher
 
@@ -164,13 +164,49 @@ controller — VICE's log confirmed
 hats, 17 buttons` and the game autostarted normally with
 `-joydev1 4 -joydev2 0` on the command line.
 
-## Next steps
+## Process tracking / return-to-front — done (2026-08-20)
 
-## Phase 3 (polish)
+- [x] `_launch_selected` keeps the `Popen` handle from `vice.launch_game`
+      and hands it to `_watch_process`, which polls `proc.poll()` via
+      `self.after(500, ...)` (no extra thread needed — Tkinter-safe).
+      When the process exits, the status bar updates
+      (`"<title> exited. Ready."`) and the window is brought back with
+      `deiconify()` / `lift()` / `focus_force()`.
+- [x] Guards `self.winfo_exists()` before each poll so a closed window
+      doesn't leave a dangling `after()` callback.
 
-- [ ] Track the running VICE process so the launcher can detect when a
-      game exits and bring itself back to front
-- [ ] Packaging (PyInstaller) for a distributable binary, if wanted
+**Tested:** a scripted check that launches a short-lived fake process,
+iconifies the window (simulating it being minimized while "playing"),
+pumps the Tk event loop, and confirms the status bar and window state
+both update correctly once the process exits.
+
+## Packaging — done (2026-08-20)
+
+- [x] `vice-launcher.spec` (PyInstaller onefile + windowed) and
+      `tools/build_binary.sh` (creates a `.build-venv`, installs
+      PyInstaller into it, builds via the spec) produce a standalone
+      `dist/vice-launcher` binary (~12MB, no system Python required to
+      run it).
+- [x] **Packaging bug caught and fixed along the way:** `config.json`'s
+      path was derived from `__file__`, which under a PyInstaller
+      onefile build resolves into a temp extraction dir that's wiped
+      after every run — settings would have silently reset on every
+      launch of the packaged binary. Config now lives at
+      `~/.config/vice-launcher/config.json` (respecting
+      `$XDG_CONFIG_HOME`, overridable via `$VICE_LAUNCHER_CONFIG`), with
+      a one-time automatic migration from the old project-root
+      `config.json` for existing dev installs (frozen builds skip
+      migration, since a distributed binary shouldn't assume access to
+      a dev checkout's project root).
+
+**Tested:** `py_compile`; verified migration copies an existing
+project-root `config.json` (games_dir, joydev1, recent history) into the
+new XDG path correctly; built the binary via `tools/build_binary.sh`
+from a clean `build/`/`dist/`; ran the built binary standalone (no
+crash, clean exit on timeout) and confirmed it reads the same XDG config
+path as the dev-mode script.
+
+## Phase 3 — all items complete
 
 ## Decisions made so far (for reference)
 
