@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 config.json
 .claude/
+
+# PyInstaller build output and the venv used to build it
+build/
+dist/
+.build-venv/

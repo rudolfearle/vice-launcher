@@ -1,11 +1,30 @@
 import json
 import os
+import shutil
+import sys
 from datetime import datetime, timezone
 
-# config.json lives at the project root, next to main.py
-CONFIG_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.json")
+# Config lives in the standard per-user config dir (~/.config/vice-launcher
+# by default). This can't be "next to main.py" -- when packaged with
+# PyInstaller (onefile), __file__ resolves into a temp extraction dir that's
+# wiped after every run, which would silently lose all settings each launch.
+_XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
+    os.path.expanduser("~"), ".config"
 )
+CONFIG_PATH = os.environ.get(
+    "VICE_LAUNCHER_CONFIG",
+    os.path.join(_XDG_CONFIG_HOME, "vice-launcher", "config.json"),
+)
+
+# Where config.json used to live (project root, next to main.py) before the
+# move to the XDG path above. Only used to migrate an existing dev install's
+# settings the first time the new path is missing.
+if getattr(sys, "frozen", False):
+    _LEGACY_CONFIG_PATH = None
+else:
+    _LEGACY_CONFIG_PATH = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.json")
+    )
 
 RECENT_LIMIT = 20
 
@@ -22,7 +41,17 @@ DEFAULT_CONFIG = {
 }
 
 
+def _migrate_legacy_config():
+    if not _LEGACY_CONFIG_PATH or not os.path.exists(_LEGACY_CONFIG_PATH):
+        return
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    shutil.copyfile(_LEGACY_CONFIG_PATH, CONFIG_PATH)
+
+
 def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        _migrate_legacy_config()
+
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r") as f:
             data = json.load(f)
@@ -33,6 +62,7 @@ def load_config():
 
 
 def save_config(cfg):
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
 
