@@ -11,6 +11,22 @@ from . import vice
 PREVIEW_MAX_WIDTH = 260
 PREVIEW_MAX_HEIGHT = 300
 
+LETTER_FILTERS = [
+    "1-0,A", "B", "C", "D", "E", "F", "G", "H-I",
+    "J-K", "L-M", "N-O", "P-Q", "R", "S", "T", "U-Z",
+]
+LETTER_FILTERS_PER_ROW = 8
+
+
+def _title_matches_letter_filter(title, label):
+    ch = title[0].upper() if title else ""
+    if label == "1-0,A":
+        return not ch.isalpha() or ch == "A"
+    if "-" in label:
+        lo, hi = label.split("-")
+        return lo <= ch <= hi
+    return ch == label
+
 
 class LauncherApp(tk.Tk):
     def __init__(self):
@@ -22,6 +38,7 @@ class LauncherApp(tk.Tk):
         self.all_games = []
         self.filtered_games = []
         self.view_var = tk.StringVar(value="all")
+        self.letter_filter_var = tk.StringVar(value="")
         self.preview_image = None
 
         self._build_menu()
@@ -75,6 +92,10 @@ class LauncherApp(tk.Tk):
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var)
         search_entry.pack(side="left", fill="x", expand=True, padx=6)
 
+        letters_frame = ttk.Frame(left_frame)
+        letters_frame.pack(fill="x", pady=(6, 0))
+        self._build_letter_filter_buttons(letters_frame)
+
         list_frame = ttk.Frame(left_frame)
         list_frame.pack(fill="both", expand=True, pady=8)
 
@@ -103,10 +124,47 @@ class LauncherApp(tk.Tk):
         status_bar = ttk.Label(self, textvariable=self.status_var, anchor="w", relief="sunken")
         status_bar.pack(fill="x", side="bottom")
 
+    def _build_letter_filter_buttons(self, parent):
+        self.letter_buttons = {}
+        row = None
+        for i, label in enumerate(LETTER_FILTERS):
+            if i % LETTER_FILTERS_PER_ROW == 0:
+                row = ttk.Frame(parent)
+                row.pack(fill="x")
+            btn = tk.Button(
+                row, text=label, width=5, relief="raised",
+                command=lambda label=label: self._set_letter_filter(label),
+            )
+            btn.pack(side="left", padx=1, pady=1)
+            self.letter_buttons[label] = btn
+        tk.Button(row, text="Reset", width=6, command=self._reset_filters).pack(
+            side="left", padx=(8, 1), pady=1
+        )
+        self._default_button_bg = next(iter(self.letter_buttons.values())).cget("bg")
+
     # ---------- Actions ----------
 
     def _open_preferences(self):
         PreferencesDialog(self, self.cfg, on_save=self._refresh_library)
+
+    def _set_letter_filter(self, label):
+        self.letter_filter_var.set("" if self.letter_filter_var.get() == label else label)
+        self._refresh_letter_button_styles()
+        self._apply_filter()
+
+    def _reset_filters(self):
+        self.letter_filter_var.set("")
+        self.search_var.set("")
+        self._refresh_letter_button_styles()
+        self._apply_filter()
+
+    def _refresh_letter_button_styles(self):
+        active = self.letter_filter_var.get()
+        for label, btn in self.letter_buttons.items():
+            if label == active:
+                btn.config(relief="sunken", bg="#a0c4ff")
+            else:
+                btn.config(relief="raised", bg=self._default_button_bg)
 
     def _refresh_library(self):
         games_dir = self.cfg.get("games_dir")
@@ -133,6 +191,10 @@ class LauncherApp(tk.Tk):
             ]
         else:
             base = list(self.all_games)
+
+        letter = self.letter_filter_var.get()
+        if letter:
+            base = [g for g in base if _title_matches_letter_filter(g["title"], letter)]
 
         self.filtered_games = (
             [g for g in base if query in g["title"].lower()] if query else base
