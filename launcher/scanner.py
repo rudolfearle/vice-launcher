@@ -10,8 +10,9 @@ SUPPORTED_EXTENSIONS = {
 }
 
 # Folder names to skip during a scan (case-insensitive): machine/drive BIOS
-# dumps, and our own cover-art storage -- neither holds games.
-EXCLUDED_DIR_NAMES = {"bios", "images"}
+# dumps, our own cover-art storage, and a review folder for flagged
+# duplicate/near-duplicate games -- none of these hold real games.
+EXCLUDED_DIR_NAMES = {"bios", "images", "dublicates", "duplicates"}
 
 
 def scan_games(games_dir):
