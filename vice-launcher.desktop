@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VICE Game Launcher
+Comment=Launch Commodore 64 games through VICE
+Exec=python3 /media/medaLib/Development/vice-Launcher/main.py
+Icon=applications-games
+Terminal=false
+Categories=Game;
