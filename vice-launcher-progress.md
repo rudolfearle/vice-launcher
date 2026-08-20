@@ -248,6 +248,90 @@ eyeballed every one of the 110 game entries that came from a fuzzy
 match (printed in the tool's output) and confirmed each pairing is
 correct before trusting the cutoff.
 
+## Letter-range filter buttons — done (2026-08-20)
+
+Row of buttons below the search box (`1-0,A / B / C / D / E / F / G / H-I
+/ J-K / L-M / N-O / P-Q / R / S / T / U-Z`, wrapping across 2 rows) plus a
+Reset button. Clicking a button filters to titles starting with that
+letter/range (combines with the search box); clicking the active one
+again toggles it off; Reset clears both the letter filter and search
+text. Active button highlighted (sunken + blue background via plain
+`tk.Button`, since ttk's "pressed" state doesn't render distinctly
+across themes). Note: user's requested list skipped "D" between C and
+E -- included it anyway to keep full A-Z coverage, no gap.
+
+**Tested:** unit checks on the matcher for every group including edge
+cases (leading digit/symbol/apostrophe titles falling into "1-0,A"), a
+scripted GUI check confirming click/toggle/reset/combine-with-search
+all update `filtered_games` correctly and the active button's
+background changes, and a visual screenshot confirming the layout.
+
+## Duplicate game de-duplication — done (2026-08-20/21)
+
+- [x] `scanner.scan_games` now de-duplicates by exact title (same title
+      found in more than one subfolder -- e.g. `c64 tapes` duplicating a
+      disk image already under a letter folder -- keeps only the first
+      one found; directory traversal is sorted for reproducible
+      results). Also excludes `images/` from scanning (cover-art zip
+      packs dropped there were being picked up as 17 fake "games").
+      Library went from 22,021 entries to 20,347 unique real games.
+- [x] User reorganized the library: moved `bios/` out to
+      `/media/SHARE/bios/biosC64` and created an empty `dublicates/`
+      review folder under `roms/c64`. `scanner.py` now excludes both
+      `dublicates` and `duplicates` (either spelling) from scans.
+- [x] Added `tools/find_duplicates.py` for a broader class of
+      duplicates the exact-title dedup above can't catch: same game
+      under a different release naming convention -- region tags
+      (`Turrican (USA)` vs `Turrican (Europe)`) or roman-numeral vs
+      arabic sequel notation (`Bomb Jack 2` vs `Bomb Jack II`). Nothing
+      is deleted -- one file per group is picked as "kept" (left alone)
+      and the rest are *copied* into `dublicates/` for manual review,
+      with a `duplicate_report.txt` manifest explaining every grouping.
+      **Precision safeguard:** a group is only trusted if it has a real
+      distinguishing signal (an actual region/version tag, or a
+      roman-numeral difference) -- titles that differ *only* by a bare
+      catalog number are skipped, since many unrelated indie/homebrew
+      games share a generic name (Othello, Hangman, Mastermind, ...)
+      and would otherwise get wrongly bundled as "the same game."
+      Applied: 2,173 reliable groups, 3,006 files copied for review (921
+      low-confidence groups skipped).
+
+**Tested:** unit test on a mock folder tree (duplicate title, bios/,
+images/ exclusion); dry run vs `--apply` counts cross-checked on the
+real library; specifically re-verified that Othello/Hangman/Mastermind
+(21/13/13 same-title entries, no real distinguishing tag) are correctly
+excluded while genuine variant families (10th Frame, 1942, 3D Stock Cars
+II/2, ...) are correctly grouped.
+
+## Cover art: ScreenScraper / TheGamesDB downloader — built, pending credentials (2026-08-21)
+
+Investigated Batocera's three image sources (ScreenScraper, TheGamesDB,
+Arcade Database) for filling the remaining ~71% of games with no cover
+art. **Arcade Database ruled out** -- it's MAME's own database; its
+"Commodore 64" entries are for MAME emulating the C64 as a system
+(softlist ROMs), not a general TOSEC-style box-art source, so it
+wouldn't have meaningful coverage here. Built `tools/download_covers.py`
+against ScreenScraper (`jeuInfos.php`, systemeid=66) and TheGamesDB
+(`Games/ByGameName` + `Games/Images`, platform ID looked up dynamically
+rather than hardcoded) -- both require the user's own registered API
+credentials (free, but registration can't be done on their behalf).
+Downloaded images are converted to real PNG via Pillow (tool-time only,
+not a runtime dependency of the packaged app) so format never matters.
+Credentials read from a local gitignored JSON file
+(`~/.config/vice-launcher/scraper_credentials.json`), never committed;
+`tools/scraper_credentials.example.json` documents the shape.
+
+**Tested:** dry run (no network calls) confirmed correct on the real
+library (14,717 / 20,347 games missing art); refuses to proceed under
+`--apply` with missing/incomplete credentials; both API clients'
+response-parsing logic unit-tested against mocked HTTP responses
+(including two conflicting TheGamesDB response shapes found during
+research, both handled); PNG conversion verified end-to-end including
+that `tk.PhotoImage` (what the real app uses) loads the result cleanly.
+**Not yet tested: live API calls** -- pending the user registering for
+ScreenScraper devid/devpassword + ssid/sspassword and a TheGamesDB API
+key.
+
 ## Decisions made so far (for reference)
 
 - **GUI toolkit:** Tkinter, chosen for zero extra dependencies. PyQt6
