@@ -114,12 +114,32 @@ the real library. Also cleared out some stale test data (`recent`
 entries like `/games/g24.d64`) that had leaked into it from an earlier
 unit test run that didn't scope its `CONFIG_PATH` to a scratch file.
 
+## Cover art preview — done (2026-08-20)
+
+- [x] Split the main window into a game list (left) and an image preview
+      panel (right, ~280px). Selecting a game (click, arrow keys) updates
+      the preview via `<<ListboxSelect>>`.
+- [x] `launcher/covers.py: find_cover_path` looks for
+      `<games_dir>/images/<title>-image.png`, falling back to
+      `<title>-thumb.png`, matching art dropped in
+      `/media/SHARE/roms/c64/images` (1,444 files covering ~722 of the
+      22,004 games — most titles simply have no art, and that's expected
+      given the dataset, not a matching bug).
+- [x] Images are loaded with plain `tk.PhotoImage` (no Pillow dependency)
+      and downscaled to fit a 260x300 box via integer `subsample()`.
+      Falls back to a "No image available" label when there's no match
+      or the file fails to load.
+
+**Tested:** `py_compile`, a scripted check that builds `LauncherApp`,
+confirms the preview panel sits to the right of the list via widget
+geometry, and confirms selecting a game with known art
+(`1942 (15)`) attaches a correctly-resized image (224x256) to the
+preview label.
+
 ## Next steps
 
 ## Phase 3 (polish)
 
-- [ ] Cover art support — thumbnail per game, likely via a filename-keyed
-      `covers/` folder
 - [ ] Joystick/controller pass-through configuration
 - [ ] Track the running VICE process so the launcher can detect when a
       game exits and bring itself back to front
