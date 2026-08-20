@@ -9,32 +9,43 @@ SUPPORTED_EXTENSIONS = {
     ".zip",                            # zipped images (VICE can open these directly)
 }
 
-# Folder names to skip during a scan (case-insensitive), e.g. machine/drive
-# BIOS dumps that live alongside a game collection but aren't games.
-EXCLUDED_DIR_NAMES = {"bios"}
+# Folder names to skip during a scan (case-insensitive): machine/drive BIOS
+# dumps, and our own cover-art storage -- neither holds games.
+EXCLUDED_DIR_NAMES = {"bios", "images"}
 
 
 def scan_games(games_dir):
-    """Walk games_dir recursively and return a sorted list of game entries.
+    """Walk games_dir recursively and return a sorted, de-duplicated list of
+    game entries.
+
+    The same title sometimes exists in more than one subfolder (e.g. a disk
+    image and a separately-collected tape image of the same game) -- only
+    the first one encountered is kept, so each title is listed once.
+    Directory traversal order is sorted for reproducible results.
 
     Each entry is a dict: {"path": ..., "title": ..., "ext": ...}
     """
     games = []
+    seen_titles = set()
     if not games_dir or not os.path.isdir(games_dir):
         return games
 
     for root, dirs, files in os.walk(games_dir):
-        dirs[:] = [d for d in dirs if d.lower() not in EXCLUDED_DIR_NAMES]
-        for name in files:
+        dirs[:] = sorted(d for d in dirs if d.lower() not in EXCLUDED_DIR_NAMES)
+        for name in sorted(files):
             ext = os.path.splitext(name)[1].lower()
-            if ext in SUPPORTED_EXTENSIONS:
-                full_path = os.path.join(root, name)
-                title = os.path.splitext(name)[0]
-                games.append({
-                    "path": full_path,
-                    "title": title,
-                    "ext": ext,
-                })
+            if ext not in SUPPORTED_EXTENSIONS:
+                continue
+            title = os.path.splitext(name)[0]
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+            full_path = os.path.join(root, name)
+            games.append({
+                "path": full_path,
+                "title": title,
+                "ext": ext,
+            })
 
     games.sort(key=lambda g: g["title"].lower())
     return games
