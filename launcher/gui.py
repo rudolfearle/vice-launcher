@@ -181,15 +181,30 @@ class LauncherApp(tk.Tk):
             return
         game = self.filtered_games[selection[0]]
         try:
-            vice.launch_game(self.cfg, game)
+            proc = vice.launch_game(self.cfg, game)
             cfgmod.add_recent(self.cfg, game["path"])
             self.status_var.set(f"Launched: {game['title']}")
             if self.view_var.get() == "recent":
                 self._apply_filter()
+            self._watch_process(proc, game["title"])
         except FileNotFoundError as e:
             messagebox.showerror("Could not launch", str(e))
         except Exception as e:
             messagebox.showerror("Error launching game", str(e))
+
+    def _watch_process(self, proc, title):
+        self._poll_process(proc, title)
+
+    def _poll_process(self, proc, title):
+        if not self.winfo_exists():
+            return
+        if proc.poll() is None:
+            self.after(500, lambda: self._poll_process(proc, title))
+            return
+        self.status_var.set(f"{title} exited. Ready.")
+        self.deiconify()
+        self.lift()
+        self.focus_force()
 
     def _toggle_favorite(self, game):
         cfgmod.toggle_favorite(self.cfg, game["path"])
