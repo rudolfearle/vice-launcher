@@ -2,7 +2,7 @@
 
 _Last updated: 2026-08-20_
 
-## Status: Phase 1 and Phase 2 complete, pushed to GitHub
+## Status: Phase 1 and Phase 2 complete, pushed to GitHub. Real VICE launch confirmed working.
 
 Repo: https://github.com/rudolfearle/vice-launcher
 
@@ -30,9 +30,8 @@ A working Tkinter front-end for launching Commodore game images through
 - Machine-mapping and binary resolution logic verified, including the
   "VICE not installed" fallback path
 
-**Not yet tested:** actually launching a real VICE binary against a real
-game — the sandbox this was built in doesn't have VICE installed. Worth
-doing as your first real-world check on Mint or Fedora.
+Real-world launch against actual VICE and a real game library is now
+confirmed working — see "Real-world launch test" below.
 
 ## Project structure
 
@@ -77,7 +76,43 @@ machine override get/set) and the zip extraction fallback (both a zip
 with a usable image and one without), plus a scripted Tk smoke test that
 builds `LauncherApp`, loads a fake library, exercises the favorites view,
 sets a machine override, and opens `PreferencesDialog` — all without
-errors. Still not tested: an actual VICE binary launching a real game.
+errors.
+
+## Real-world launch test — passed (2026-08-20)
+
+Ran the full launch path against the real library at
+`/media/SHARE/roms/c64` (22,021 games, almost entirely `.zip`) with the
+actual `x64sc` binary (VICE 3.7.1, apt-installed):
+
+- Scanned the library successfully (22,021 entries).
+- Picked a zipped game (`b/Boulder Dash 12 (15871).zip`), containing a
+  `.T64` tape image.
+- The zip auto-extract fallback correctly pulled `BDASH12.T64` out to a
+  temp dir and launched that instead of the raw zip.
+- `x64sc -autostart <extracted .T64>` ran to completion: loaded the C64
+  ROMs, attached the tape image, autostarted the program, and the
+  process stayed alive (confirmed via `Popen.poll()` after 5s, then
+  cleanly terminated by us).
+
+**Blocker hit and resolved along the way:** the apt `vice` package
+ships with no C64 ROMs (kernal/basic/chargen are copyrighted and
+excluded per `/usr/share/doc/vice/README.ROMs`). VICE failed with
+`Couldn't load kernal ROM` until ROMs were supplied. This is a
+machine-setup issue, not a launcher bug. Fix used on this machine:
+copied `kernal-901227-03.bin`, `basic-901226-01.bin`, and
+`chargen-901225-01.bin` into the per-user ROM path
+`~/.local/share/vice/C64/` (no root needed — this path is checked
+before the system-wide `/usr/share/vice/C64/`). Note VICE 3.7.1's
+compiled-in default expects those exact revisioned filenames, not the
+generic `kernal`/`basic`/`chargen` names some older docs reference.
+This ROM setup lives outside the repo (per-user, not project state) —
+nothing to commit for it.
+
+**Local config:** `config.json` (gitignored) now has `games_dir` set to
+`/media/SHARE/roms/c64` on this machine so the app opens straight into
+the real library. Also cleared out some stale test data (`recent`
+entries like `/games/g24.d64`) that had leaked into it from an earlier
+unit test run that didn't scope its `CONFIG_PATH` to a scratch file.
 
 ## Next steps
 
