@@ -7,3 +7,6 @@ config.json
 build/
 dist/
 .build-venv/
+
+# Real scraper API credentials (keep tools/scraper_credentials.example.json tracked)
+scraper_credentials.json
