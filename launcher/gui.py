@@ -4,6 +4,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import config as cfgmod
 from . import covers
+from . import joystick as joymod
 from . import scanner
 from . import vice
 
@@ -249,6 +250,15 @@ class PreferencesDialog(tk.Toplevel):
         self.flatpak_var = tk.BooleanVar(value=cfg.get("vice_flatpak", False))
         self.default_machine_var = tk.StringVar(value=cfg.get("default_machine", "x64sc"))
 
+        self.joystick_devices = joymod.available_devices()
+        self.joystick_labels = [label for _code, label in self.joystick_devices]
+        self.joydev1_var = tk.StringVar(
+            value=joymod.label_for_device(cfg.get("joydev1", 0))
+        )
+        self.joydev2_var = tk.StringVar(
+            value=joymod.label_for_device(cfg.get("joydev2", 0))
+        )
+
         pad = {"padx": 8, "pady": 4}
 
         row = ttk.Frame(self)
@@ -277,6 +287,30 @@ class PreferencesDialog(tk.Toplevel):
             state="readonly", width=10,
         ).pack(side="left", padx=4)
 
+        row = ttk.Frame(self)
+        row.pack(fill="x", **pad)
+        ttk.Label(row, text="Joystick port 1:").pack(side="left")
+        ttk.Combobox(
+            row, textvariable=self.joydev1_var, values=self.joystick_labels,
+            state="readonly", width=34,
+        ).pack(side="left", padx=4)
+
+        row = ttk.Frame(self)
+        row.pack(fill="x", **pad)
+        ttk.Label(row, text="Joystick port 2:").pack(side="left")
+        ttk.Combobox(
+            row, textvariable=self.joydev2_var, values=self.joystick_labels,
+            state="readonly", width=34,
+        ).pack(side="left", padx=4)
+
+        if len(self.joystick_devices) <= len(joymod.FIXED_DEVICES):
+            row = ttk.Frame(self)
+            row.pack(fill="x", **pad)
+            ttk.Label(
+                row, text="No physical joystick detected. Plug it in and reopen Preferences.",
+                foreground="gray",
+            ).pack(side="left")
+
         btn_row = ttk.Frame(self)
         btn_row.pack(fill="x", **pad)
         ttk.Button(btn_row, text="Cancel", command=self.destroy).pack(side="right")
@@ -295,10 +329,13 @@ class PreferencesDialog(tk.Toplevel):
             self.vice_dir_var.set(chosen)
 
     def _save(self):
+        code_by_label = {label: code for code, label in self.joystick_devices}
         self.cfg["games_dir"] = self.games_dir_var.get()
         self.cfg["vice_bin_dir"] = self.vice_dir_var.get()
         self.cfg["vice_flatpak"] = self.flatpak_var.get()
         self.cfg["default_machine"] = self.default_machine_var.get()
+        self.cfg["joydev1"] = code_by_label.get(self.joydev1_var.get(), 0)
+        self.cfg["joydev2"] = code_by_label.get(self.joydev2_var.get(), 0)
         cfgmod.save_config(self.cfg)
         self.destroy()
         self.on_save()

@@ -19,6 +19,18 @@ EXTENSION_MACHINE = {
 
 MACHINES = ["x64sc", "x128", "xvic", "xplus4", "xpet", "xcbm2"]
 
+# Which native joystick ports (-joydev1, -joydev2) each machine binary supports.
+# PET and CBM-II have no native joystick ports (userport adapters only), and the
+# VIC-20 has just one.
+JOYSTICK_PORTS = {
+    "x64sc": (True, True),
+    "x128": (True, True),
+    "xvic": (True, False),
+    "xplus4": (True, True),
+    "xpet": (False, False),
+    "xcbm2": (False, False),
+}
+
 
 def machine_for_extension(ext, cfg=None):
     default = cfg.get("default_machine", "x64sc") if cfg else "x64sc"
@@ -89,5 +101,12 @@ def launch_game(cfg, game):
             f"Fix this via File > Preferences, or, if you installed "
             f"VICE through Flathub, enable the Flatpak VICE option there instead."
         )
-    full_command = command + ["-autostart", launch_path]
+    joystick_args = []
+    supports_port1, supports_port2 = JOYSTICK_PORTS.get(machine, (True, True))
+    if supports_port1:
+        joystick_args += ["-joydev1", str(cfg.get("joydev1", 0))]
+    if supports_port2:
+        joystick_args += ["-joydev2", str(cfg.get("joydev2", 0))]
+
+    full_command = command + joystick_args + ["-autostart", launch_path]
     return subprocess.Popen(full_command)

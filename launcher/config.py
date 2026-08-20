@@ -17,6 +17,8 @@ DEFAULT_CONFIG = {
     "favorites": [],           # list of game paths
     "recent": [],               # list of {"path": ..., "ts": iso timestamp}, newest first
     "machine_overrides": {},     # {path: machine}
+    "joydev1": 0,                 # VICE -joydev1 device code (0 = None)
+    "joydev2": 0,                  # VICE -joydev2 device code (0 = None)
 }
 
 
