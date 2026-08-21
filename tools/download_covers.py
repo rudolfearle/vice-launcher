@@ -59,6 +59,20 @@ def base_title(title):
     return re.sub(r"(\s*\([^)]*\))+\s*$", "", title).strip()
 
 
+_CREDENTIAL_PARAMS = ("devid", "devpassword", "ssid", "sspassword", "apikey")
+
+
+def redact_credentials(text):
+    """Strip credential values out of a string (e.g. an exception message
+    that embedded a request URL) before it's ever printed or logged --
+    ScreenScraper's media URLs in particular carry devid/devpassword/ssid/
+    sspassword as plain query params."""
+    text = str(text)
+    for param in _CREDENTIAL_PARAMS:
+        text = re.sub(rf"({param}=)[^&\s]+", r"\1<redacted>", text, flags=re.IGNORECASE)
+    return text
+
+
 def load_credentials(path):
     if not os.path.exists(path):
         return {}
@@ -272,10 +286,10 @@ def main():
             if url is None and use_tgdb:
                 url = tgdb_client.find_box_art_url(title)
         except RateLimitExceeded as e:
-            stopped_early = str(e)
+            stopped_early = redact_credentials(e)
             break
         except Exception as e:
-            print(f"  ERROR looking up {title!r}: {e}")
+            print(f"  ERROR looking up {title!r}: {redact_credentials(e)}")
             errors += 1
             time.sleep(REQUEST_DELAY_SECONDS)
             continue
@@ -295,7 +309,7 @@ def main():
             downloaded += 1
             print(f"  downloaded: {title}")
         except Exception as e:
-            print(f"  ERROR downloading {title!r}: {e}")
+            print(f"  ERROR downloading {title!r}: {redact_credentials(e)}")
             errors += 1
 
         time.sleep(REQUEST_DELAY_SECONDS)
