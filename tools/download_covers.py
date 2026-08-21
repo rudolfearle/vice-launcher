@@ -49,6 +49,12 @@ DEFAULT_CREDENTIALS_PATH = os.path.join(
 )
 
 
+class RateLimitExceeded(Exception):
+    """Raised when a source reports its request quota is exhausted, so the
+    caller can stop immediately instead of grinding through the rest of the
+    (now-guaranteed-to-fail) list."""
+
+
 def base_title(title):
     return re.sub(r"(\s*\([^)]*\))+\s*$", "", title).strip()
 
@@ -91,6 +97,8 @@ class ScreenScraperClient:
             "romnom": base_title(title),
         }
         resp = requests.get(f"{SCREENSCRAPER_BASE}/jeuInfos.php", params=params, timeout=15)
+        if resp.status_code in (418, 429):
+            raise RateLimitExceeded(f"ScreenScraper returned {resp.status_code}: {resp.text[:200]}")
         if resp.status_code != 200:
             return None
         try:
@@ -106,6 +114,24 @@ class ScreenScraperClient:
                 if media.get("type") == wanted_type and media.get("url"):
                     return media["url"]
         return None
+
+
+def _raise_if_rate_limited(resp, source_name):
+    if resp.status_code not in (418, 429):
+        return
+    detail = ""
+    try:
+        body = resp.json()
+        remaining = body.get("remaining_monthly_allowance")
+        refresh_secs = body.get("allowance_refresh_timer")
+        if remaining is not None:
+            detail = f" (remaining_monthly_allowance={remaining}"
+            if refresh_secs:
+                detail += f", refreshes in {refresh_secs / 86400:.1f} days"
+            detail += ")"
+    except ValueError:
+        pass
+    raise RateLimitExceeded(f"{source_name} returned {resp.status_code}{detail}")
 
 
 class TheGamesDBClient:
@@ -124,6 +150,7 @@ class TheGamesDBClient:
         resp = requests.get(
             f"{THEGAMESDB_BASE}/Platforms", params={"apikey": self.api_key}, timeout=15
         )
+        _raise_if_rate_limited(resp, "TheGamesDB")
         resp.raise_for_status()
         platforms = resp.json()["data"]["platforms"]
         for pid, info in platforms.items():
@@ -145,6 +172,7 @@ class TheGamesDBClient:
             },
             timeout=15,
         )
+        _raise_if_rate_limited(search, "TheGamesDB")
         if search.status_code != 200:
             return None
         games = search.json().get("data", {}).get("games", [])
@@ -157,6 +185,7 @@ class TheGamesDBClient:
             params={"apikey": self.api_key, "games_id": game_id, "filter[type]": "boxart"},
             timeout=15,
         )
+        _raise_if_rate_limited(images, "TheGamesDB")
         if images.status_code != 200:
             return None
         payload = images.json().get("data", {})
@@ -231,6 +260,7 @@ def main():
 
     os.makedirs(images_dir, exist_ok=True)
     downloaded, not_found, errors = 0, 0, 0
+    stopped_early = None
     for g in missing:
         if args.limit is not None and downloaded >= args.limit:
             break
@@ -241,6 +271,9 @@ def main():
                 url = ss_client.find_box_art_url(title)
             if url is None and use_tgdb:
                 url = tgdb_client.find_box_art_url(title)
+        except RateLimitExceeded as e:
+            stopped_early = str(e)
+            break
         except Exception as e:
             print(f"  ERROR looking up {title!r}: {e}")
             errors += 1
@@ -270,6 +303,8 @@ def main():
     print(f"\nDownloaded: {downloaded}")
     print(f"Not found on any source: {not_found}")
     print(f"Errors: {errors}")
+    if stopped_early:
+        print(f"\nStopped early -- rate limit hit: {stopped_early}")
 
 
 if __name__ == "__main__":
