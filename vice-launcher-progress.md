@@ -332,6 +332,51 @@ that `tk.PhotoImage` (what the real app uses) loads the result cleanly.
 ScreenScraper devid/devpassword + ssid/sspassword and a TheGamesDB API
 key.
 
+## Cover art downloader: live runs (2026-08-21 to 2026-08-24)
+
+**TheGamesDB run:** credentials worked immediately (platform id 40
+confirmed). Ran a 500-game batch -- but the tool had a real bug: it
+silently treated a 429 (rate limited) the same as "not found," so once
+the account's **monthly** quota hit 0 partway through (after 276 real
+downloads), it spent the next hour grinding through the remaining
+~14,000 games with zero chance of success instead of stopping. Fixed:
+both clients now detect 418/429 and raise `RateLimitExceeded`, which the
+main loop catches and stops on immediately, printing
+`remaining_monthly_allowance` / refresh time when TheGamesDB provides
+it (verified against the real, still-exhausted account -- refreshes in
+~30 days from 2026-08-21).
+
+**ScreenScraper run:** first devid/devpassword attempt got a 403
+("Vérifier vos identifiants développeur") -- those came from a
+different source than the account's own login; re-requested/corrected
+via the forum and it started working. Also found (and fixed) that
+ScreenScraper's media URLs embed devid/devpassword/ssid/sspassword as
+plain query-string params -- `redact_credentials()` now strips these
+out of any error message before it's printed or logged, so a network
+error never leaks them into a log file. Account quota check
+(`ssuser.requeststoday` / `maxrequestsperday`) showed massive headroom
+(50,000/day; `requestskotoday` tracks *failed* requests specifically,
+not general usage, so it isn't the binding constraint). Ran a small
+300-game validation batch (clean, 0 errors), then the full remaining
+backlog in one long background run (~10-15 hours, via `nohup` +
+`Monitor` with `tail -f --pid=<pid>` so the watch ends automatically
+when the process exits):
+
+- Downloaded: 5,784
+- Not found on ScreenScraper: 8,334
+- Errors: 20 (one transient network blip -- "no route to host," self-
+  recovered within minutes -- plus a handful of "cannot identify image
+  file" for a few malformed responses)
+- No rate limit hit at any point
+
+**Coverage: 5,944 -> 11,993 / 20,347 games (58.9%)**, combining the
+Lassiveran pack, the zip-logo pack, and now ScreenScraper/TheGamesDB.
+TheGamesDB remains unavailable until its monthly quota resets
+(~2026-09-20); re-running `download_covers.py --source thegamesdb`
+after that (or `--source both` once ScreenScraper alone doesn't cover
+enough) would pick up more of the remaining ~8,354 games with no art at
+all.
+
 ## Decisions made so far (for reference)
 
 - **GUI toolkit:** Tkinter, chosen for zero extra dependencies. PyQt6
