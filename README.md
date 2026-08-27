@@ -1,4 +1,4 @@
-# VICE Game Launcher (Phase 1)
+# VICE Game Launcher
 
 A minimal Tkinter front-end for launching Commodore games through the
 [VICE emulator](https://vice-emu.sourceforge.io/).
@@ -35,17 +35,6 @@ need to do this once.
 
 Double-click (or select + Enter, or the Launch button) starts the game
 via `x64sc -autostart <file>`.
-
-## Current limitations (Phase 1 scope)
-
-- Everything launches with the C64 core (`x64sc`) — no per-game machine
-  override yet (VIC-20/C128/Plus4/PET support in `launcher/vice.py` is
-  wired up but not yet exposed in the UI).
-- No favorites, recently-played, or cover art yet.
-- No packaging — this runs from source with `python3 main.py`.
-
-These are the natural next steps for Phase 2 whenever you want to keep
-going.
 
 ## Project layout
 
